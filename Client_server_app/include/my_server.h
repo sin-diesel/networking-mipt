@@ -128,6 +128,7 @@ enum cmd_len {
 
 /* Mutexes which are responsible for threads */
 extern pthread_mutex_t mutexes[];
+extern pthread_mutex_t guard_mutexes[];
 
 int check_input(int argc, char** argv, int* connection_type);
 
@@ -162,7 +163,7 @@ int shell_execute(char* buf, struct message* msg, char* cwd);
 
 void init_daemon();
 
-int mutex_init(pthread_mutex_t* mutexes, int* id_map);
+int mutex_init(pthread_mutex_t* mutexes, pthread_mutex_t* guard_mutexes, int* id_map);
 
 int get_msg(int sk, struct sockaddr_in* sk_addr, struct message* msg, struct sockaddr_in* client_data,
              int* client_sk, int* pclient_sk, int connection_type);

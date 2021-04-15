@@ -2,6 +2,7 @@
 
 
 pthread_mutex_t mutexes[MAXCLIENTS] = {0};
+pthread_mutex_t guard_mutexes[MAXCLIENTS] = {0};
 int client_sockets[MAXCLIENTS];
 
 void* tcp_handle_connection(void* memory) {
@@ -91,9 +92,12 @@ void* udp_handle_connection(void* memory) {
         //memcpy(&msg, memory, sizeof(struct message));
         /* Lock mutex */
         LOG("Waiting for mutex to be unlocked%s\n", "");
-        LOG("Mutex unlocked%s\n", "");
         pthread_mutex_lock(&mutexes[msg.id]);
+
+        pthread_mutex_lock(&guard_mutexes[msg.id]);
         memcpy(&msg, memory, sizeof(struct message));
+        LOG("Mutex unlocked%s\n", "");
+        pthread_mutex_unlock(&guard_mutexes[msg.id]);
 
         print_info(&msg);
         ret = print_client_addr(&msg);

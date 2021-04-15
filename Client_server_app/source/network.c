@@ -116,7 +116,7 @@ int server_init(int connection_type, int* sk, struct sockaddr_in* sk_addr, int* 
         return -1;
     }
 
-    ret = mutex_init(mutexes, id_map);
+    ret = mutex_init(mutexes, guard_mutexes, id_map);
     if (ret < 0) {
         return -1;
     }
@@ -789,11 +789,12 @@ void addr_init(struct sockaddr_in* sk_addr, in_addr_t addr) {
     sk_addr->sin_addr.s_addr = htonl(addr);
 }
 
-int mutex_init(pthread_mutex_t* mutexes, int* id_map) {
+int mutex_init(pthread_mutex_t* mutexes, pthread_mutex_t* guard_mutexes, int* id_map) {
     int ret = 0;
     for (int i = 0; i < MAXCLIENTS; ++i) {
         /* Initialize mutexes */
         ret = pthread_mutex_init(&mutexes[i], NULL);
+        ret = pthread_mutex_init(&guard_mutexes[i], NULL);
         if (ret < 0) {
             ERROR(errno);
             LOG("Error initializing mutex: %s\n", strerror(errno));
