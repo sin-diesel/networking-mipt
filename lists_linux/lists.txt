@@ -1,0 +1,15 @@
+1) struct my_data {
+	....
+	struct list* l;
+	struct list* next;
+	struct list* prev;
+}
+
+2) Пример реализации:
+struct list {
+	struct list* next;
+	struct list* prev;
+}
+
+3) #define LIST_HEAD(name) \
+	struct list name = {&(name), &(name)}

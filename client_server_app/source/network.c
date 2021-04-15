@@ -848,6 +848,13 @@ int check_broadcast(int sk, struct message* msg, struct sockaddr_in* client_data
     return 0;
 }
 
+
+//---------------------------------------------------
+void udp_handle_thread();
+
+void tcp_handle_thread();
+
+
 //---------------------------------------------------
 /* Handle clients to corresponding threads */
 int threads_distribute(int connection_type, struct message* memory, struct message* msg,

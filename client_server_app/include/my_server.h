@@ -113,6 +113,16 @@ enum cmd_len {
     QUIT_LEN = sizeof(QUIT) - 1
 };
 
+struct server_info {
+    int connection_type;
+    int sk;
+    struct sockaddr_in sk_addr;
+    struct message*  memory;
+    pthread_mutex_t* mutexes;
+    int* thread_ids;
+    int* id_map;
+};
+
 
 /* Path for local communication with sockets */
 #define PATH "/tmp/my_socket"
