@@ -21,6 +21,7 @@ int main(int argc, char** argv) {
     with a particular client */
     pthread_t thread_ids[MAXCLIENTS];
     struct message* memory = NULL;
+    struct server_info info;
 
     /* Basically bitmap */
     int id_map[MAXCLIENTS];
@@ -32,15 +33,16 @@ int main(int argc, char** argv) {
         exit(EXIT_FAILURE);
     }
 
+    info.thread_ids = thread_ids;
     /* Prepare server for main routine */
-    ret =  server_init(connection_type, &sk, &sk_addr, id_map, &memory, mutexes);
+    ret =  server_init(connection_type, &sk, &sk_addr, id_map, &memory, mutexes, &info);
     if (ret < 0) {
         printf("Error initializing server.\n");
         exit(EXIT_FAILURE);
     }
 
     /* Server operation */
-    ret = server_routine(connection_type, sk, &sk_addr, memory, mutexes, thread_ids, id_map);
+    ret = server_routine(&info);
     if (ret < 0) {
         printf("Error in server operation.\n");
         exit(EXIT_FAILURE);

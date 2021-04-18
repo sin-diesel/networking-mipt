@@ -113,15 +113,19 @@ enum cmd_len {
     QUIT_LEN = sizeof(QUIT) - 1
 };
 
+
 struct server_info {
     int connection_type;
     int sk;
-    struct sockaddr_in sk_addr;
+    struct sockaddr_in* sk_addr;
     struct message*  memory;
     pthread_mutex_t* mutexes;
-    int* thread_ids;
+    pthread_t* thread_ids;
     int* id_map;
+    int (*msg_handler)(struct server_info* info, int* pclient_sk, int* client_sk, struct message* msg, struct sockaddr_in* client_data);
 };
+
+//typedef int (*msg_handler)(struct server_info* info, int* pclient_sk, int* client_sk, struct message* msg, struct sockaddr_in* client_data);
 
 
 /* Path for local communication with sockets */
@@ -143,13 +147,16 @@ extern pthread_mutex_t guard_mutexes[];
 int check_input(int argc, char** argv, int* connection_type);
 
 int server_init(int connection_type, int* sk, struct sockaddr_in* sk_addr, int* id_map,
-                struct message** memory, pthread_mutex_t* mutexes);
+                struct message** memory, pthread_mutex_t* mutexes, struct server_info* info);
 
 int client_init(int connection_type, int* sk, char* ip_addr, struct sockaddr_in* sk_addr,
                 struct sockaddr_in* sk_bind, struct sockaddr_in* sk_broad);
 
-int server_routine(int connection_type, int sk, struct sockaddr_in* sk_addr, struct message* memory,
-        pthread_mutex_t* mutexes, pthread_t* thread_ids, int* id_map);
+int server_routine(struct server_info* info);
+
+int udp_get_msg(struct server_info* info, int* pclient_sk, int* client_sk, struct message* msg, struct sockaddr_in* client_data);
+
+int tcp_get_msg(struct server_info* info, int* pclient_sk, int* client_sk, struct message* msg, struct sockaddr_in* client_data);
 
 int client_routine(int connection_type, int sk, struct sockaddr_in* sk_addr,
                                                 struct sockaddr_in* sk_broad,
@@ -167,7 +174,7 @@ void print_info(struct message* msg);
 
 int shell_init(int* pid);
 
-int check_broadcast(int sk, struct message* msg, struct sockaddr_in* client_data);
+int check_broadcast(struct server_info* info, struct message* msg, struct sockaddr_in* client_data);
 
 int shell_execute(char* buf, struct message* msg, char* cwd);
 
@@ -175,11 +182,11 @@ void init_daemon();
 
 int mutex_init(pthread_mutex_t* mutexes, pthread_mutex_t* guard_mutexes, int* id_map);
 
-int get_msg(int sk, struct sockaddr_in* sk_addr, struct message* msg, struct sockaddr_in* client_data,
-             int* client_sk, int* pclient_sk, int connection_type);
+int get_msg(struct server_info* info, struct message* msg, struct sockaddr_in* client_data,
+             int* client_sk, int* pclient_sk);
 
-int threads_distribute(int connection_type, struct message* memory, struct message* msg,
-                        pthread_t* thread_ids, int* id_map, int client_sk, int* pclient_sk);
+int threads_distribute(struct server_info* info, struct message* msg,
+                        pthread_t* thread_ids, int client_sk, int* pclient_sk);
 
 int print_client_addr(struct message* msg);
 

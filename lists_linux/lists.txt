@@ -13,3 +13,54 @@ struct list {
 
 3) #define LIST_HEAD(name) \
 	struct list name = {&(name), &(name)}
+
+4) void list_init(struct list*) {
+	list->prev = list;
+	list->next = list;
+}
+
+5) void list_add(struct list* new, struct list* head) {
+	__list_head(new, head, head->next);
+}
+
+// it is a helper, do not give to user
+static inline __list_add(struct list* item,
+						 struct list* prev,
+						 struct list* next) {
+prev->next = item;
+next->prev = item;
+item->prev = prev;
+item->next = next;
+
+						 }
+
+6) void list_add_back(struct list* new, struct list* head) {
+	__list_add(new, head->prev, head);
+}
+
+7) void list_del(struct list* old) {
+	old->prev->next = old->next;
+	old->next->prev = old->prev;
+}
+
+8) searching in lists
+
+#define list_for_each_entry(pos, head, member) \
+for (pos = container_of(head->next,
+		typeof(*pos), member);
+		&pos->member != head;
+		pos = container_of(pos->member.next), typeof(*pos), member));
+
+#define container_of(ptr, type, member) \
+	{const typeof(((type*)0)->member) *__mptr = ptr;
+	(type*)((char*) __mptr - offsetoff(type, member)):} // таким образом получаем указатель на саму структуру
+
+example: 
+struct my_type {
+	int data;
+	char member;
+}
+
+struct my_type item = {0};
+void* ptr = &(item.lst);
+

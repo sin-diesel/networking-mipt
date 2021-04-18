@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include "field.h"
+#include "list.h"
 
 int main(int argc, char** argv) {
 
@@ -24,6 +25,3 @@ int main(int argc, char** argv) {
 	printf("Result: %d", res);
 
 }
-
-
-// ./a.out mn.so
