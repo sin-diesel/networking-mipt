@@ -927,7 +927,6 @@ int udp_get_msg(struct server_info* info, int* pclient_sk, int* client_sk, struc
 
     socklen_t addrlen;
     addrlen = sizeof(*client_data);
-    /* Receiving message from client */
     ret = recvfrom(info->sk, msg, sizeof(struct message), 0, (struct sockaddr*) client_data, &addrlen);
     if (ret < 0) {
         ERROR(errno);

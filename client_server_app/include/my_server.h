@@ -17,6 +17,7 @@
 #include <termios.h>
 #include <assert.h>
 #include <sys/stat.h>
+#include <semaphore.h>
 
 /* for sockets */
 #include <sys/socket.h>
