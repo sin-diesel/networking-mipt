@@ -17,6 +17,7 @@
 #include <termios.h>
 #include <assert.h>
 #include <sys/stat.h>
+#include <semaphore.h>
 
 /* for sockets */
 #include <sys/socket.h>
@@ -65,7 +66,7 @@ static const char log_path[] = "/var/log/server.log";
 #define QUIT "quit"
 
 /* Command and message size */
-#define CMDSIZE 32
+#define CMDSIZE 512
 #define MSGSIZE 1024
 
 /* Max path that can be sent via cd command */
@@ -78,7 +79,7 @@ static const char log_path[] = "/var/log/server.log";
 struct message {    
     int id;
     char cmd[CMDSIZE];
-    char data[MSGSIZE];
+    char data[MSGSIZE]; 
     struct sockaddr_in client_data;
     /* For tcp */
     int client_sk;
@@ -87,6 +88,7 @@ struct message {
 enum connection_type {
     UDP_CON = 0,
     TCP_CON,
+    NONE
 };
 
 /* Types of commands that can be sent to our server */
@@ -114,7 +116,10 @@ enum cmd_len {
 
 
 <<<<<<< HEAD:Client_server_app/include/my_server.h
+<<<<<<< HEAD:Client_server_app/include/my_server.h
 =======
+=======
+>>>>>>> master:client_server_app/include/my_server.h
 struct server_info {
     int connection_type;
     int sk;
@@ -130,7 +135,10 @@ struct server_info {
 //typedef int (*msg_handler)(struct server_info* info, int* pclient_sk, int* client_sk, struct message* msg, struct sockaddr_in* client_data);
 
 
+<<<<<<< HEAD:Client_server_app/include/my_server.h
 >>>>>>> 71251cb... Fixed tcp descriptor error, refactored function calls, cleaned up some code mess:client_server_app/include/my_server.h
+=======
+>>>>>>> master:client_server_app/include/my_server.h
 /* Path for local communication with sockets */
 #define PATH "/tmp/my_socket"
 
@@ -145,6 +153,7 @@ struct server_info {
 
 /* Mutexes which are responsible for threads */
 extern pthread_mutex_t mutexes[];
+<<<<<<< HEAD:Client_server_app/include/my_server.h
 <<<<<<< HEAD:Client_server_app/include/my_server.h
 
 int check_input(int argc, char** argv, char** command, char** arg);
@@ -165,6 +174,24 @@ int udp_get_msg(struct server_info* info, int* client_sk, struct message* msg, s
 
 int tcp_get_msg(struct server_info* info, int* client_sk, struct message* msg, struct sockaddr_in* client_data);
 
+=======
+extern pthread_mutex_t guard_mutexes[];
+
+int check_input(int argc, char** argv, int* connection_type);
+
+int server_init(int connection_type, int* sk, struct sockaddr_in* sk_addr, int* id_map,
+                struct message** memory, pthread_mutex_t* mutexes, struct server_info* info);
+
+int client_init(int connection_type, int* sk, char* ip_addr, struct sockaddr_in* sk_addr,
+                struct sockaddr_in* sk_bind, struct sockaddr_in* sk_broad);
+
+int server_routine(struct server_info* info);
+
+int udp_get_msg(struct server_info* info, int* client_sk, struct message* msg, struct sockaddr_in* client_data);
+
+int tcp_get_msg(struct server_info* info, int* client_sk, struct message* msg, struct sockaddr_in* client_data);
+
+>>>>>>> master:client_server_app/include/my_server.h
 int udp_handle_thread(struct server_info* info, struct message* msg, int* client_sk);
 
 int tcp_handle_thread(struct server_info* info, struct message* msg, int* client_sk);
@@ -174,23 +201,33 @@ int client_routine(int connection_type, int sk, struct sockaddr_in* sk_addr,
                                                 struct sockaddr_in* server_data);
 
 int parse_input(char* input, char* cmd, char* args);
+<<<<<<< HEAD:Client_server_app/include/my_server.h
 >>>>>>> 71251cb... Fixed tcp descriptor error, refactored function calls, cleaned up some code mess:client_server_app/include/my_server.h
+=======
+>>>>>>> master:client_server_app/include/my_server.h
 
 int send_message(int sk, struct message* msg, int msg_len, struct sockaddr_in* sk_addr);
+
+int handle_reply(struct message* msg, struct sockaddr_in* server_data);
 
 int lookup(int* id_map, int n_ids, pid_t id);
 
 void print_info(struct message* msg);
 
-int init_shell(int* pid);
+int shell_init(int* pid);
 
-void start_shell(char* buf, char* input, char* cwd);
+int check_broadcast(struct server_info* info, struct message* msg, struct sockaddr_in* client_data);
+
+int shell_execute(char* buf, struct message* msg, char* cwd);
 
 void init_daemon();
 
 <<<<<<< HEAD:Client_server_app/include/my_server.h
+<<<<<<< HEAD:Client_server_app/include/my_server.h
 void mutex_init(pthread_mutex_t* mutexes, int* id_map);
 =======
+=======
+>>>>>>> master:client_server_app/include/my_server.h
 int mutex_init(pthread_mutex_t* mutexes, pthread_mutex_t* guard_mutexes, int* id_map);
 
 int get_msg(struct server_info* info, struct message* msg, struct sockaddr_in* client_data,
@@ -202,23 +239,26 @@ int threads_distribute(struct server_info* info, struct message* msg,
 int print_client_addr(struct message* msg);
 
 int handle_message(struct message* msg, char* dir, char* buf);
+<<<<<<< HEAD:Client_server_app/include/my_server.h
 >>>>>>> 71251cb... Fixed tcp descriptor error, refactored function calls, cleaned up some code mess:client_server_app/include/my_server.h
+=======
+>>>>>>> master:client_server_app/include/my_server.h
 
-void udp_get_msg(int sk, struct sockaddr_in* sk_addr, struct message* msg, struct sockaddr_in* client_data, int connection_type);
+void thread_routine(struct message*  msg, struct message* memory, char* dir, char* buf);
 
-void* handle_connection(void* memory);
+void* udp_handle_connection(void* memory);
 
 void* tcp_handle_connection(void* memory);
 
 void check_thread(pthread_t* thread_ids, struct message* thread_memory, int* id_map, struct message* msg, void* handle_connection);
 
-void terminate_server(int sk);
+void terminate_server();
 
 void send_broadcast(int sk, struct message* msg, struct sockaddr_in* client_data);
 
-void reply_to_client(struct message* msg);
+int reply_to_client(struct message* msg);
 
-void tcp_reply_to_client(int client_sk, struct message* msg);
+int tcp_reply_to_client(int client_sk, struct message* msg);
 
 void send_to_server(int sk, struct message* msg, struct sockaddr_in* sk_addr, \
                      struct sockaddr_in* server_data, socklen_t* addrlen); 
