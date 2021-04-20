@@ -145,8 +145,10 @@ int server_init(int connection_type, int* sk, struct sockaddr_in* sk_addr, int* 
     info->sk_addr = sk_addr;
     if (connection_type == UDP_CON) {
         info->msg_handler = &udp_get_msg;
+        info->thread_handler = &udp_handle_thread;
     } else {
         info->msg_handler = &tcp_get_msg;
+        info->thread_handler = &tcp_handle_thread;
     }
 
     return 0;
@@ -367,9 +369,9 @@ int client_routine(int connection_type, int sk,
         printf("Bytes sent: %d\n\n\n", ret);
             
         /* Receive reply from server */
-        //if (connection_type == UDP_CON) {
-        ret = recvfrom(sk, &msg, sizeof(struct message), 0, (struct sockaddr*) server_data, &addrlen);
-        //ret = recvfrom(sk, &msg, sizeof(struct message), 0, (struct sockaddr*) server_data, &addrlen);
+        //if (connection_type == TCP_CON) { 
+            //ret = read(sk, &msg, sizeof(struct message));
+            ret = recvfrom(sk, &msg, sizeof(struct message), 0, (struct sockaddr*) server_data, &addrlen);
         //ret = recvfrom(sk, &msg, sizeof(struct message), 0, (struct sockaddr*) server_data, &addrlen);
 
         printf("Bytes received: %d\n", ret);
@@ -388,6 +390,7 @@ int client_routine(int connection_type, int sk,
         ret = handle_reply(&msg, server_data);
         if (ret < 0 ) {
             printf("Error analyzing contents of a message.\n");
+            close(sk);
             return -1;
         }
        // }
@@ -403,13 +406,12 @@ int server_routine(struct server_info* info) {
     int ret = 0;
     struct sockaddr_in client_data = {0};
     int client_sk = 0;
-    int* pclient_sk = NULL;
 
     while (1) {
 
         memset(&msg, 0, sizeof(struct message));
         /* Get message from client */
-        ret = get_msg(info, &msg, &client_data, &client_sk, pclient_sk);
+        ret = get_msg(info, &msg, &client_data, &client_sk);
         if (ret < 0) {
             return -1;
         }
@@ -425,9 +427,9 @@ int server_routine(struct server_info* info) {
             LOG("Error in checking broadcast message.%s \n", "");
             exit(EXIT_FAILURE);
         }
-    
+
         ret = threads_distribute(info,
-                                    &msg, info->thread_ids, client_sk, pclient_sk);
+                                    &msg, info->thread_ids, &client_sk);
         if (ret < 0) {
             return -1;
         }
@@ -861,68 +863,128 @@ int check_broadcast(struct server_info* info, struct message* msg, struct sockad
 
 
 //---------------------------------------------------
-void udp_handle_thread();
+int udp_handle_thread(struct server_info* info, struct message* msg, int* client_sk) {
 
-void tcp_handle_thread();
-
-
-//---------------------------------------------------
-/* Handle clients to corresponding threads */
-int threads_distribute(struct server_info* info, struct message* msg,
-                        pthread_t* thread_ids, int client_sk, int* pclient_sk) {
-    /* Access the corresponding location in memory */
     int ret = 0;
     struct message* thread_memory = NULL;
-
-    if (info->connection_type == UDP_CON) {
-        thread_memory = &((info->memory)[msg->id]);
-        memcpy(thread_memory, msg, sizeof(struct message));
-    }
+    thread_memory = &((info->memory)[msg->id]);
+    memcpy(thread_memory, msg, sizeof(struct message));
 
     /* Check whether we need a new thread. Create one if needed */
-    if (info->connection_type == UDP_CON) {
-        int exists = lookup(info->id_map, MAXCLIENTS, msg->id);
-        if (exists == 0) {
-            LOG("New client accepted: %d\n", msg->id);
-            info->id_map[msg->id] = 1;
-            /* Handing over this client to a new thread */
-            ret = pthread_create(&thread_ids[msg->id], NULL, udp_handle_connection, thread_memory);
-            if (ret < 0) {
-                LOG("Error creating thread: %s\n", strerror(errno));
-                ERROR(errno);
-                return -1;
-            }
-        } else {
-            LOG("Old client accepted: %d\n", msg->id);
+    int exists = lookup(info->id_map, MAXCLIENTS, msg->id);
+    if (exists == 0) {
+        LOG("New client accepted: %d\n", msg->id);
+        info->id_map[msg->id] = 1;
+        /* Handing over this client to a new thread */
+        ret = pthread_create(&(info->thread_ids[msg->id]), NULL, udp_handle_connection, thread_memory);
+        if (ret < 0) {
+            LOG("Error creating thread: %s\n", strerror(errno));
+            ERROR(errno);
+            return -1;
         }
     } else {
-        ret = pthread_create(&thread_ids[client_sk], NULL, tcp_handle_connection, pclient_sk);
+        LOG("Old client accepted: %d\n", msg->id);
+    }
+    /* Transfer data to corresponding client's memory cell */
+    thread_memory = &((info->memory)[msg->id]);
+    memcpy(thread_memory, msg, sizeof(struct message));
+
+    /* Unlock mutex so client thread could access the memory */
+    ret = pthread_mutex_unlock(&mutexes[msg->id]);
+    if (ret < 0) {
+        LOG("Error unlocking mutex.%s\n", "");
+        return -1;
+    }
+    printf("\n\n\n");
+    return 0;
+}
+
+int tcp_handle_thread(struct server_info* info, struct message* msg, int* client_sk)  {
+    int ret = 0;
+    LOG("Client sk distributed: %d\n", *client_sk);
+
+    //pthread_mutex_lock(&mutexes[0]);
+
+    ret = pthread_create(&(info->thread_ids[*client_sk]), NULL, tcp_handle_connection, client_sk);
         if (ret < 0) {
             LOG("Error creating thread: %s\n", strerror(errno));
             ERROR(errno);
             exit(EXIT_FAILURE);
         }
-    }
-    /* Transfer data to corresponding client's memory cell */
-    if (info->connection_type == UDP_CON) {
-        thread_memory = &((info->memory)[msg->id]);
-        memcpy(thread_memory, msg, sizeof(struct message));
-    }
 
-    /* Unlock mutex so client thread could access the memory */
-    if (info->connection_type == UDP_CON) {
-        ret = pthread_mutex_unlock(&mutexes[msg->id]);
-        if (ret < 0) {
-            LOG("Error unlocking mutex.%s\n", "");
-            return -1;
-        }
+    //ret = pthread_mutex_unlock(&mutexes[0]);
+
+    if (ret < 0) {
+        LOG("Error unlocking mutex.%s\n", "");
+        return -1;
     }
-    printf("\n\n\n");
+    return 0;
+}
+
+
+//---------------------------------------------------
+/* Handle clients to corresponding threads */
+int threads_distribute(struct server_info* info, struct message* msg,
+                        pthread_t* thread_ids, int* client_sk) {
+    /* Access the corresponding location in memory */
+    int ret = 0;
+
+    if (info->connection_type == UDP_CON) {
+        ret = info->thread_handler(info, msg, NULL);
+    } else {
+        ret = info->thread_handler(info, msg, client_sk);
+    }
+    if (ret < 0) {
+        return -1;
+    }
+    //     thread_memory = &((info->memory)[msg->id]);
+    //     memcpy(thread_memory, msg, sizeof(struct message));
+    // }
+
+    // /* Check whether we need a new thread. Create one if needed */
+    // if (info->connection_type == UDP_CON) {
+    //     int exists = lookup(info->id_map, MAXCLIENTS, msg->id);
+    //     if (exists == 0) {
+    //         LOG("New client accepted: %d\n", msg->id);
+    //         info->id_map[msg->id] = 1;
+    //         /* Handing over this client to a new thread */
+    //         ret = pthread_create(&thread_ids[msg->id], NULL, udp_handle_connection, thread_memory);
+    //         if (ret < 0) {
+    //             LOG("Error creating thread: %s\n", strerror(errno));
+    //             ERROR(errno);
+    //             return -1;
+    //         }
+    //     } else {
+    //         LOG("Old client accepted: %d\n", msg->id);
+    //     }
+    // } else {
+    //     ret = pthread_create(&thread_ids[client_sk], NULL, tcp_handle_connection, pclient_sk);
+    //     if (ret < 0) {
+    //         LOG("Error creating thread: %s\n", strerror(errno));
+    //         ERROR(errno);
+    //         exit(EXIT_FAILURE);
+    //     }
+    // }
+    // /* Transfer data to corresponding client's memory cell */
+    // if (info->connection_type == UDP_CON) {
+    //     thread_memory = &((info->memory)[msg->id]);
+    //     memcpy(thread_memory, msg, sizeof(struct message));
+    // }
+
+    // /* Unlock mutex so client thread could access the memory */
+    // if (info->connection_type == UDP_CON) {
+    //     ret = pthread_mutex_unlock(&mutexes[msg->id]);
+    //     if (ret < 0) {
+    //         LOG("Error unlocking mutex.%s\n", "");
+    //         return -1;
+    //     }
+    // }
+    // printf("\n\n\n");
 
     return 0;
 }
 
-int udp_get_msg(struct server_info* info, int* pclient_sk, int* client_sk, struct message* msg, struct sockaddr_in* client_data) {
+int udp_get_msg(struct server_info* info, int* client_sk, struct message* msg, struct sockaddr_in* client_data) {
     int ret = 0;
 
     socklen_t addrlen;
@@ -937,10 +999,21 @@ int udp_get_msg(struct server_info* info, int* pclient_sk, int* client_sk, struc
     /* Copy client address manually, we get here in UDP mode */
     memcpy(&(msg->client_data), client_data, sizeof(struct sockaddr_in));
 
+    LOG("\n\n\nBytes received: %d\n", ret);
+    LOG("Message size expected: %ld\n", sizeof(struct message));
+
+    char* addr = inet_ntoa(client_data->sin_addr);
+    if (addr == NULL) {
+        LOG("ERROR: Client address invalid: %s\n", strerror(errno));
+    }
+
+    LOG("Client address: %s\n", addr);
+    LOG("Client port: %d\n", htons(client_data->sin_port));
+
     return 0;
 }
 
-int tcp_get_msg(struct server_info* info, int* pclient_sk, int* client_sk, struct message* msg, struct sockaddr_in* client_data) {
+int tcp_get_msg(struct server_info* info, int* client_sk, struct message* msg, struct sockaddr_in* client_data) {
      /* Accept client connections */
         LOG("Waiting for message to come\n%s", "");
 
@@ -950,28 +1023,28 @@ int tcp_get_msg(struct server_info* info, int* pclient_sk, int* client_sk, struc
             return -1;
         }
 
-        pclient_sk = (int*) calloc(1, sizeof(int));
-        if (pclient_sk == NULL) {
-            LOG("Error allocating memory for client_sk%s\n", "");
-            return -1;
-        }
-        *pclient_sk = *client_sk;
+        // *pclient_sk = (int*) calloc(1, sizeof(int));
+        // if (pclient_sk == NULL) {
+        //     LOG("Error allocating memory for client_sk%s\n", "");
+        //     return -1;
+        // }
+        // **pclient_sk = *client_sk;
 
         LOG("Client sk assigned: %d\n", *client_sk);
-        return 0;
+        return *client_sk;
 }
 
 //---------------------------------------------------
 /* Accept message from client and place it in msg buffer */
 int get_msg(struct server_info* info, struct message* msg, struct sockaddr_in* client_data,
-             int* client_sk, int* pclient_sk) {
+             int* client_sk) {
     
     int ret = 0;
 
     if (info->connection_type == UDP_CON) {
-        info->msg_handler(info, NULL, NULL, msg, client_data);
+        info->msg_handler(info, NULL, msg, client_data);
     } else {
-        info->msg_handler(info, pclient_sk, client_sk, msg, client_data);
+        info->msg_handler(info, client_sk, msg, client_data);
     }
 
     // if (info->connection_type == UDP_CON) {
@@ -1004,17 +1077,6 @@ int get_msg(struct server_info* info, struct message* msg, struct sockaddr_in* c
 
     // /* Copy client address manually, we get here in UDP mode */
     // memcpy(&(msg->client_data), client_data, sizeof(struct sockaddr_in));
-
-    LOG("\n\n\nBytes received: %d\n", ret);
-    LOG("Message size expected: %ld\n", sizeof(struct message));
-
-    char* addr = inet_ntoa(client_data->sin_addr);
-    if (addr == NULL) {
-        LOG("ERROR: Client address invalid: %s\n", strerror(errno));
-    }
-
-    LOG("Client address: %s\n", addr);
-    LOG("Client port: %d\n", htons(client_data->sin_port));
     return 0;
 }
 

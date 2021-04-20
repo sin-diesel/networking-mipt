@@ -38,6 +38,7 @@ int main(int argc, char** argv) {
     ret =  server_init(connection_type, &sk, &sk_addr, id_map, &memory, mutexes, &info);
     if (ret < 0) {
         printf("Error initializing server.\n");
+        close(sk);
         exit(EXIT_FAILURE);
     }
 
@@ -45,6 +46,7 @@ int main(int argc, char** argv) {
     ret = server_routine(&info);
     if (ret < 0) {
         printf("Error in server operation.\n");
+        close(sk);
         exit(EXIT_FAILURE);
     }
 

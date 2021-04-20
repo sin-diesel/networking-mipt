@@ -6,14 +6,15 @@ pthread_mutex_t guard_mutexes[MAXCLIENTS] = {0};
 int client_sockets[MAXCLIENTS];
 
 void* tcp_handle_connection(void* memory) {
+
+    LOG("Entered new thread (TCP) %s\n", "");
     struct message msg;
     int ret = 0;
     char dir[MAXPATH];
     char buf[BUFSIZ];
     char* dirp;
     int client_sk = *((int*) memory);
-
-    LOG("Entered new thread (TCP) %s\n", "");
+    LOG("Client sk in handler: %d\n", client_sk);
 
     /* Init client directory*/
     dirp = getcwd(dir, MAXPATH);
@@ -25,9 +26,12 @@ void* tcp_handle_connection(void* memory) {
     LOG("Current thread directory: %s\n", dir);
 
     while (1) {
-        printf("Reading from client_sk %d\n", client_sk);
+
+        //pthread_mutex_lock(&mutexes[0]);
+
+        LOG("Reading from client_sk %d\n", client_sk);
         ret = read(client_sk, &msg, sizeof(struct message));
-        printf("Message read.\n");
+        LOG("Message read.%s\n", "");
         if (ret < 0) {
             LOG("Error reading from client socket %d\n", client_sk);
             ERROR(errno);
