@@ -88,7 +88,8 @@ int handle_message(struct message* msg, char* dir, char* buf) {
         return 0;
     } else if (strncmp(msg->cmd, EXIT, EXIT_LEN) == 0) {
     /* Quit server */
-        terminate_server();
+        LOG("Closing server%s", "");
+        exit(EXIT_SUCCESS);
     } else {
     /* Otherwise start shell and execute command */
         ret = shell_execute(buf, msg, dir);
@@ -385,12 +386,12 @@ int client_routine(struct client_info* info, struct sockaddr_in* server_data) {
 // ENUM 
         if (strncmp(msg.cmd, BROAD, BROAD_LEN) == 0) {
             ret = send_message(info->sk, &msg, sizeof(struct message), info->sk_broad);
-        } else {    
-            //if (connection_type == UDP_CON) {
+        } else if (strncmp(msg.cmd, EXIT, EXIT_LEN) == 0) {
             ret = send_message(info->sk, &msg, sizeof(struct message), info->sk_addr);
-            //} else {
-                //ret = send(sk, &msg, sizeof(struct message), 0);
-           // }
+            close(info->sk);
+            return 0;
+        } else {    
+            ret = send_message(info->sk, &msg, sizeof(struct message), info->sk_addr);
         }
         printf("Bytes sent: %d\n\n\n", ret);
             
