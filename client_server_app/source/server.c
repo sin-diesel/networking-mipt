@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
     int id_map[MAXCLIENTS];
 
     
-    ret = check_input(argc, argv, &connection_type);
+    ret = server_check_input(argc, argv, &connection_type);
     if (ret < 0) {
         printf("Incorrect option passed.\n");
         exit(EXIT_FAILURE);

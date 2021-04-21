@@ -27,7 +27,7 @@ void print_info(struct message* msg) {
 
 //---------------------------------------------------
 /* Check options passed to server */
-int check_input(int argc, char** argv, int* connection_type) {
+int server_check_input(int argc, char** argv, int* connection_type) {
     if (argc == 2) {
         if (strcmp(argv[1], "--udp") == 0) {
             printf("UDP connection setting set.\n");
@@ -42,6 +42,25 @@ int check_input(int argc, char** argv, int* connection_type) {
         }
     }
     return -1;
+}
+
+int client_check_input(int argc, char** argv, int* connection_type, char* ip_addr) {
+    if (argc >= 2) {
+        if (strcmp(argv[1], "--udp") == 0) {
+            printf("UDP connection set\n");
+            *connection_type = UDP_CON;
+        } else if (strcmp(argv[1], "--tcp") == 0) {
+            printf("TCP connection set\n");
+            *connection_type = TCP_CON;
+        } else if (strcmp(argv[1], "--ip") == 0) {
+            ip_addr =  argv[2];
+            printf("IP address entered: %s\n", ip_addr);
+        } else {
+            printf("Invalid connection type.\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    return 0;  
 }
 
 
@@ -146,16 +165,19 @@ int server_init(int connection_type, int* sk, struct sockaddr_in* sk_addr, int* 
     if (connection_type == UDP_CON) {
         info->msg_handler = &udp_get_msg;
         info->thread_handler = &udp_handle_thread;
+        info->connection_handler = &udp_handle_connection;
     } else {
         info->msg_handler = &tcp_get_msg;
         info->thread_handler = &tcp_handle_thread;
+        info->connection_handler = &tcp_handle_connection;
     }
 
     return 0;
 }
 
-int client_init(int connection_type, int* sk, char* ip_addr, struct sockaddr_in* sk_addr,
-                struct sockaddr_in* sk_bind, struct sockaddr_in* sk_broad) {
+int client_init(int connection_type, int* sk, struct sockaddr_in* sk_addr,  \
+                                              struct sockaddr_in* sk_bind,  \
+                                              struct sockaddr_in* sk_broad, char* ip_addr, struct client_info* info) {
     /* Init socket address and family */
     in_addr_t ipin_addr = -1;
     struct sockaddr_in server_data;
@@ -188,7 +210,7 @@ int client_init(int connection_type, int* sk, char* ip_addr, struct sockaddr_in*
             printf("IP address is invalid\n");
         }
         sk_addr->sin_addr.s_addr = addr.s_addr;
-        printf("IP address of server assigned:%s\n", ip_addr);
+        printf("IP address of server assigned:%s\n", info->ip_addr);
     }
 
     /* Binding socket */
@@ -208,6 +230,13 @@ int client_init(int connection_type, int* sk, char* ip_addr, struct sockaddr_in*
             return -1;
         }
     }
+
+    info->connection_type = connection_type;
+    info->sk = *sk;
+    info->sk_addr = sk_addr;
+    info->sk_bind = sk_bind;
+    info->sk_broad = sk_broad;
+
     return 0;
 }
 
@@ -331,23 +360,20 @@ int handle_reply(struct message* msg, struct sockaddr_in* server_data) {
     return 0;
 }
 
-int client_routine(int connection_type, int sk,
-                                                struct sockaddr_in* sk_addr,
-                                                struct sockaddr_in* sk_broad,
-                                                struct sockaddr_in* server_data) {
+int client_routine(struct client_info* info, struct sockaddr_in* server_data) {
     int ret = 0;
     socklen_t addrlen = sizeof(*server_data);
 
+    char input[BUFSIZ];
+    char cmd[CMDSIZE];
+    char args[MSGSIZE];
+
+    memset(input, 0, BUFSIZ);
+    memset(cmd, 0, CMDSIZE);
+    memset(args, 0, MSGSIZE);
+    struct message msg;
+
     while(1) {
-
-        char input[BUFSIZ];
-        char cmd[CMDSIZE];
-        char args[MSGSIZE];
-
-        memset(input, 0, BUFSIZ);
-        memset(cmd, 0, CMDSIZE);
-        memset(args, 0, MSGSIZE);
-        struct message msg;
 
         ret = construct_command(input, cmd, args, &msg);
 
@@ -358,44 +384,40 @@ int client_routine(int connection_type, int sk,
         printf("Sending command\n");
 // ENUM 
         if (strncmp(msg.cmd, BROAD, BROAD_LEN) == 0) {
-            ret = send_message(sk, &msg, sizeof(struct message), sk_broad);
+            ret = send_message(info->sk, &msg, sizeof(struct message), info->sk_broad);
         } else {    
-            if (connection_type == UDP_CON) {
-                ret = send_message(sk, &msg, sizeof(struct message), sk_addr);
-            } else {
-                ret = send(sk, &msg, sizeof(struct message), 0);
-            }
+            //if (connection_type == UDP_CON) {
+            ret = send_message(info->sk, &msg, sizeof(struct message), info->sk_addr);
+            //} else {
+                //ret = send(sk, &msg, sizeof(struct message), 0);
+           // }
         }
         printf("Bytes sent: %d\n\n\n", ret);
             
         /* Receive reply from server */
-        //if (connection_type == TCP_CON) { 
-            //ret = read(sk, &msg, sizeof(struct message));
-            ret = recvfrom(sk, &msg, sizeof(struct message), 0, (struct sockaddr*) server_data, &addrlen);
-        //ret = recvfrom(sk, &msg, sizeof(struct message), 0, (struct sockaddr*) server_data, &addrlen);
+        ret = recvfrom(info->sk, &msg, sizeof(struct message), 0, (struct sockaddr*) server_data, &addrlen);
 
         printf("Bytes received: %d\n", ret);
         if (ret < 0) {
             ERROR(errno);
-            close(sk);
+            close(info->sk);
             return -1;
         }
         
         if (ret != sizeof(struct message)) {
             printf("Error receiving message in client\n");
-            close(sk);
+            close(info->sk);
             return -1;
         }
 
         ret = handle_reply(&msg, server_data);
         if (ret < 0 ) {
             printf("Error analyzing contents of a message.\n");
-            close(sk);
+            close(info->sk);
             return -1;
         }
-       // }
     }
-    close(sk);
+    close(info->sk);
 }
 
 //---------------------------------------------------
@@ -903,8 +925,6 @@ int tcp_handle_thread(struct server_info* info, struct message* msg, int* client
     int ret = 0;
     LOG("Client sk distributed: %d\n", *client_sk);
 
-    //pthread_mutex_lock(&mutexes[0]);
-
     ret = pthread_create(&(info->thread_ids[*client_sk]), NULL, tcp_handle_connection, client_sk);
         if (ret < 0) {
             LOG("Error creating thread: %s\n", strerror(errno));
@@ -912,7 +932,6 @@ int tcp_handle_thread(struct server_info* info, struct message* msg, int* client
             exit(EXIT_FAILURE);
         }
 
-    //ret = pthread_mutex_unlock(&mutexes[0]);
 
     if (ret < 0) {
         LOG("Error unlocking mutex.%s\n", "");
@@ -937,50 +956,6 @@ int threads_distribute(struct server_info* info, struct message* msg,
     if (ret < 0) {
         return -1;
     }
-    //     thread_memory = &((info->memory)[msg->id]);
-    //     memcpy(thread_memory, msg, sizeof(struct message));
-    // }
-
-    // /* Check whether we need a new thread. Create one if needed */
-    // if (info->connection_type == UDP_CON) {
-    //     int exists = lookup(info->id_map, MAXCLIENTS, msg->id);
-    //     if (exists == 0) {
-    //         LOG("New client accepted: %d\n", msg->id);
-    //         info->id_map[msg->id] = 1;
-    //         /* Handing over this client to a new thread */
-    //         ret = pthread_create(&thread_ids[msg->id], NULL, udp_handle_connection, thread_memory);
-    //         if (ret < 0) {
-    //             LOG("Error creating thread: %s\n", strerror(errno));
-    //             ERROR(errno);
-    //             return -1;
-    //         }
-    //     } else {
-    //         LOG("Old client accepted: %d\n", msg->id);
-    //     }
-    // } else {
-    //     ret = pthread_create(&thread_ids[client_sk], NULL, tcp_handle_connection, pclient_sk);
-    //     if (ret < 0) {
-    //         LOG("Error creating thread: %s\n", strerror(errno));
-    //         ERROR(errno);
-    //         exit(EXIT_FAILURE);
-    //     }
-    // }
-    // /* Transfer data to corresponding client's memory cell */
-    // if (info->connection_type == UDP_CON) {
-    //     thread_memory = &((info->memory)[msg->id]);
-    //     memcpy(thread_memory, msg, sizeof(struct message));
-    // }
-
-    // /* Unlock mutex so client thread could access the memory */
-    // if (info->connection_type == UDP_CON) {
-    //     ret = pthread_mutex_unlock(&mutexes[msg->id]);
-    //     if (ret < 0) {
-    //         LOG("Error unlocking mutex.%s\n", "");
-    //         return -1;
-    //     }
-    // }
-    // printf("\n\n\n");
-
     return 0;
 }
 
@@ -1023,13 +998,6 @@ int tcp_get_msg(struct server_info* info, int* client_sk, struct message* msg, s
             return -1;
         }
 
-        // *pclient_sk = (int*) calloc(1, sizeof(int));
-        // if (pclient_sk == NULL) {
-        //     LOG("Error allocating memory for client_sk%s\n", "");
-        //     return -1;
-        // }
-        // **pclient_sk = *client_sk;
-
         LOG("Client sk assigned: %d\n", *client_sk);
         return *client_sk;
 }
@@ -1039,7 +1007,6 @@ int tcp_get_msg(struct server_info* info, int* client_sk, struct message* msg, s
 int get_msg(struct server_info* info, struct message* msg, struct sockaddr_in* client_data,
              int* client_sk) {
     
-    int ret = 0;
 
     if (info->connection_type == UDP_CON) {
         info->msg_handler(info, NULL, msg, client_data);
@@ -1047,36 +1014,6 @@ int get_msg(struct server_info* info, struct message* msg, struct sockaddr_in* c
         info->msg_handler(info, client_sk, msg, client_data);
     }
 
-    // if (info->connection_type == UDP_CON) {
-    //     ret = recvfrom(info->sk, msg, sizeof(struct message), 0, (struct sockaddr*) client_data, &addrlen);
-    //     if (ret < 0) {
-    //         ERROR(errno);
-    //         LOG("Error receiving msg: %s\n", strerror(errno));
-    //         return -1;
-    //     }
-    // } else {
-    //     /* Accept client connections */
-    //     LOG("Waiting for message to come\n%s", "");
-
-    //     *client_sk = accept(info->sk, NULL, NULL);
-    //     if (*client_sk < 0) {
-    //         ERROR(errno);
-    //         return -1;
-    //     }
-
-    //     pclient_sk = (int*) calloc(1, sizeof(int));
-    //     if (pclient_sk == NULL) {
-    //         LOG("Error allocating memory for client_sk%s\n", "");
-    //         return -1;
-    //     }
-    //     *pclient_sk = *client_sk;
-
-    //     LOG("Client sk assigned: %d\n", *client_sk);
-    //     return 0;
-    // }
-
-    // /* Copy client address manually, we get here in UDP mode */
-    // memcpy(&(msg->client_data), client_data, sizeof(struct sockaddr_in));
     return 0;
 }
 

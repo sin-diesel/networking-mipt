@@ -125,6 +125,16 @@ struct server_info {
     int* id_map;
     int (*msg_handler)(struct server_info* info, int* client_sk, struct message* msg, struct sockaddr_in* client_data);
     int (*thread_handler)(struct server_info* info, struct message* msg, int* client_sk);
+    void* (*connection_handler)(void* memory);
+};
+
+struct client_info {
+    int connection_type;
+    int sk;
+    struct sockaddr_in* sk_addr; 
+    struct sockaddr_in* sk_bind;
+    struct sockaddr_in* sk_broad;
+    char* ip_addr;
 };
 
 //typedef int (*msg_handler)(struct server_info* info, int* pclient_sk, int* client_sk, struct message* msg, struct sockaddr_in* client_data);
@@ -146,13 +156,16 @@ struct server_info {
 extern pthread_mutex_t mutexes[];
 extern pthread_mutex_t guard_mutexes[];
 
-int check_input(int argc, char** argv, int* connection_type);
+int server_check_input(int argc, char** argv, int* connection_type);
+
+int client_check_input(int argc, char** argv, int* connection_type, char* ip_addr);
 
 int server_init(int connection_type, int* sk, struct sockaddr_in* sk_addr, int* id_map,
                 struct message** memory, pthread_mutex_t* mutexes, struct server_info* info);
 
-int client_init(int connection_type, int* sk, char* ip_addr, struct sockaddr_in* sk_addr,
-                struct sockaddr_in* sk_bind, struct sockaddr_in* sk_broad);
+int client_init(int connection_type, int* sk, struct sockaddr_in* sk_addr,
+                                              struct sockaddr_in* sk_bind,
+                                              struct sockaddr_in* sk_broad, char* ip_addr, struct client_info* info);
 
 int server_routine(struct server_info* info);
 
@@ -164,9 +177,7 @@ int udp_handle_thread(struct server_info* info, struct message* msg, int* client
 
 int tcp_handle_thread(struct server_info* info, struct message* msg, int* client_sk);
 
-int client_routine(int connection_type, int sk, struct sockaddr_in* sk_addr,
-                                                struct sockaddr_in* sk_broad,
-                                                struct sockaddr_in* server_data);
+int client_routine(struct client_info* info, struct sockaddr_in* server_data);
 
 int parse_input(char* input, char* cmd, char* args);
 

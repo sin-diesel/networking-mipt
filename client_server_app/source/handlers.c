@@ -7,13 +7,15 @@ int client_sockets[MAXCLIENTS];
 
 void* tcp_handle_connection(void* memory) {
 
-    LOG("Entered new thread (TCP) %s\n", "");
+    LOG("Entered new thread (TCP)%s\n", "");
+
     struct message msg;
     int ret = 0;
     char dir[MAXPATH];
     char buf[BUFSIZ];
     char* dirp;
     int client_sk = *((int*) memory);
+    
     LOG("Client sk in handler: %d\n", client_sk);
 
     /* Init client directory*/
@@ -65,18 +67,18 @@ void* udp_handle_connection(void* memory) {
 
     struct message msg;
     int ret = 0;
-    memset(&msg, 0, sizeof(struct message));
 
     /* Buffer for maintaining data */
     char buf[BUFSIZ];
-    memset(buf, 0, BUFSIZ);
-    char ack[] = "Message received";
-    char none[] = "None";
+    // char ack[] = "Message received";
+    // char none[] = "None";
     char dir[MAXPATH];
+    memset(&msg, 0, sizeof(struct message));
+    memset(buf, 0, BUFSIZ);
 
     /* Construct default ack message to client */
-    memcpy(msg.cmd, none, sizeof(none));
-    memcpy(msg.data, ack, sizeof(ack));
+    // memcpy(msg.cmd, none, sizeof(none));
+    // memcpy(msg.data, ack, sizeof(ack));
 
     LOG("Entered new thread %s\n", "");
 
@@ -90,17 +92,16 @@ void* udp_handle_connection(void* memory) {
     LOG("Current thread directory: %s\n", dir);
     /* Copy data from memory */
     memcpy(&msg, memory, sizeof(struct message));
-    while (1) {
 
+    while (1) {
         /* Copy data from memory */
-        //memcpy(&msg, memory, sizeof(struct message));
         /* Lock mutex */
         LOG("Waiting for mutex to be unlocked%s\n", "");
         pthread_mutex_lock(&mutexes[msg.id]);
 
         pthread_mutex_lock(&guard_mutexes[msg.id]);
         memcpy(&msg, memory, sizeof(struct message));
-        LOG("Mutex unlocked%s\n", "");
+        LOG("Guard mutex unlocked%s\n", "");
         pthread_mutex_unlock(&guard_mutexes[msg.id]);
 
         print_info(&msg);
