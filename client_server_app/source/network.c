@@ -12,10 +12,11 @@
 8) add cd arguments to bash DONE
 9) add tcp_init and udp_init functions DONE
 10) split big output from bash into packages DONE
-11) Fix bash settings, add continous bash operation
+11) Fix bash settings, add continous bash operation DONE
 12) Fix mutexes locking/unlocking DONE
 13) fix buffers DONE
 */
+
 
 /* Print message info */
 void print_info(struct message* msg) {

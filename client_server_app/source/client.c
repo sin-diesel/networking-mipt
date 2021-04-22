@@ -1,6 +1,13 @@
 
 #include "my_server.h"
 
+static int client_socket;
+void sig_handler_1(int signum) {
+    printf("Closing client socket: %d\n", client_socket);
+    close(client_socket);
+    exit(EXIT_SUCCESS);
+}
+
 
 int main(int argc, char** argv) {
 
@@ -14,6 +21,9 @@ int main(int argc, char** argv) {
     struct sockaddr_in server_data;
     struct client_info info;
 
+    /* Signal handling */
+    signal(SIGINT, &sig_handler_1);
+
     int ret = 0;
 
     client_check_input(argc, argv, &connection_type, ip_addr);
@@ -22,6 +32,10 @@ int main(int argc, char** argv) {
     if (ret < 0) {
         exit(EXIT_FAILURE);
     }
+
+    /* So signal could access the client's socket */
+    client_socket = info.sk;
+
     ret = client_routine(&info, &server_data);
     if (ret < 0) {
         exit(EXIT_FAILURE);
