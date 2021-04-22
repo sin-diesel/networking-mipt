@@ -83,6 +83,8 @@ struct message {
     struct sockaddr_in client_data;
     /* For tcp */
     int client_sk;
+    /* For udp control */
+    int packet_number;
 };
 
 enum connection_type {
@@ -155,6 +157,7 @@ struct client_info {
 /* Mutexes which are responsible for threads */
 extern pthread_mutex_t mutexes[];
 extern pthread_mutex_t guard_mutexes[];
+extern int packets_counter[];
 
 int server_check_input(int argc, char** argv, int* connection_type);
 
@@ -166,6 +169,8 @@ int server_init(int connection_type, int* sk, struct sockaddr_in* sk_addr, int* 
 int client_init(int connection_type, int* sk, struct sockaddr_in* sk_addr,
                                               struct sockaddr_in* sk_bind,
                                               struct sockaddr_in* sk_broad, char* ip_addr, struct client_info* info);
+
+int construct_command(char* input, char* cmd, char* args, struct message* msg, int packet_num);
 
 int server_routine(struct server_info* info);
 

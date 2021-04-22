@@ -4,6 +4,7 @@
 pthread_mutex_t mutexes[MAXCLIENTS] = {0};
 pthread_mutex_t guard_mutexes[MAXCLIENTS] = {0};
 int client_sockets[MAXCLIENTS];
+int packets_counter[MAXCLIENTS];
 
 void* tcp_handle_connection(void* memory) {
 
@@ -66,6 +67,8 @@ void* tcp_handle_connection(void* memory) {
 void* udp_handle_connection(void* memory) {
 
     struct message msg;
+    int packets_sent = 0;
+    int current_packet = 0;
     int ret = 0;
 
     /* Buffer for maintaining data */
@@ -115,7 +118,19 @@ void* udp_handle_connection(void* memory) {
         if (ret < 0) {
             exit(EXIT_FAILURE);
         }
+
+        current_packet = msg.packet_number;
+        LOG("Packet number received: %d\n", current_packet);
+        LOG("Expected packet: %d\n", packets_counter[msg.id]);
+        if (current_packet != packets_counter[msg.id]) {
+            LOG("Error in packet transmission. Expected packet: %d, received: %d\n", packets_counter[msg.id], current_packet)
+        }
+
+        //packets_counter[msg.id]++;
+        msg.packet_number = packets_counter[msg.id];
+        packets_counter[msg.id]++;
         ret = reply_to_client(&msg);
+
         if (ret < 0) {
             exit(EXIT_FAILURE);
         }

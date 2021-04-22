@@ -283,7 +283,7 @@ int parse_input(char* input, char* cmd, char* args) {
     return 0;
 }
 
-int construct_command(char* input, char* cmd, char* args, struct message* msg) {
+int construct_command(char* input, char* cmd, char* args, struct message* msg, int packet_num) {
     int ret = 0;
     ret = get_input(input);
     if (ret < 0) {
@@ -335,6 +335,7 @@ int construct_command(char* input, char* cmd, char* args, struct message* msg) {
     memcpy(msg->cmd, cmd, cmd_len);
     memcpy(&(msg->id), &pid, sizeof(pid_t));
     memcpy(msg->data, args, args_len);
+    msg->packet_number = packet_num;
     return 0;
 }
 
@@ -364,6 +365,7 @@ int handle_reply(struct message* msg, struct sockaddr_in* server_data) {
 int client_routine(struct client_info* info, struct sockaddr_in* server_data) {
     int ret = 0;
     socklen_t addrlen = sizeof(*server_data);
+    int packets_sent = 0;
 
     char input[BUFSIZ];
     char cmd[CMDSIZE];
@@ -376,13 +378,14 @@ int client_routine(struct client_info* info, struct sockaddr_in* server_data) {
 
     while(1) {
 
-        ret = construct_command(input, cmd, args, &msg);
+        ret = construct_command(input, cmd, args, &msg, packets_sent);
 
         printf("Message to be sent:\n");
         printf("ID: %d\n", msg.id);
         printf("Command: %s\n", msg.cmd);
         printf("Data: %s\n", msg.data);
         printf("Sending command\n");
+        printf("Packets sent: %d\n", packets_sent);
 // ENUM 
         if (strncmp(msg.cmd, BROAD, BROAD_LEN) == 0) {
             ret = send_message(info->sk, &msg, sizeof(struct message), info->sk_broad);
@@ -411,6 +414,13 @@ int client_routine(struct client_info* info, struct sockaddr_in* server_data) {
             return -1;
         }
 
+        printf("Packet number received: %d\n", msg.packet_number);
+        printf("Packet number expected:%d\n", packets_sent);
+        if (msg.packet_number != packets_sent) {
+            printf("Wrong packet number detected.\n");
+        }
+        packets_sent++;
+
         ret = handle_reply(&msg, server_data);
         if (ret < 0 ) {
             printf("Error analyzing contents of a message.\n");
@@ -429,6 +439,11 @@ int server_routine(struct server_info* info) {
     int ret = 0;
     struct sockaddr_in client_data = {0};
     int client_sk = 0;
+    /* UDP control */
+    for (int i = 0; i < MAXCLIENTS; ++i) {
+        packets_counter[i] = 0;
+    }
+
 
     while (1) {
 
@@ -892,6 +907,7 @@ int udp_handle_thread(struct server_info* info, struct message* msg, int* client
     struct message* thread_memory = NULL;
     thread_memory = &((info->memory)[msg->id]);
     memcpy(thread_memory, msg, sizeof(struct message));
+
 
     /* Check whether we need a new thread. Create one if needed */
     int exists = lookup(info->id_map, MAXCLIENTS, msg->id);
