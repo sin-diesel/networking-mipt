@@ -105,6 +105,8 @@ int handle_message(struct message* msg, char* dir, char* buf) {
     return 0;
 }
 
+
+/* remove *sk, not needed */
 /* Initialize socket, mutexes */
 //---------------------------------------------------
 int server_init(int connection_type, int* sk, struct sockaddr_in* sk_addr, int* id_map,
@@ -183,8 +185,32 @@ int client_init(int connection_type, int* sk, struct sockaddr_in* sk_addr,  \
     /* Init socket address and family */
     in_addr_t ipin_addr = -1;
     struct sockaddr_in server_data;
+    struct termios client_term;
     socklen_t addrlen = sizeof(server_data);
     int ret = 0;
+
+    /* Signal handling */
+    ret = tcgetattr(STDIN_FILENO, &client_term);
+    if (ret < 0) {
+        ERROR(errno);
+        return -1;
+    }
+    //client_term.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP
+    //                    |INLCR|ICRNL|IXON);
+
+    //client_term.c_oflag &= ~OPOST;
+
+    client_term.c_lflag &= ~(ISIG);
+
+    client_term.c_cflag &= ~(CSIZE|PARENB);
+
+    //client_term.c_cflag |= CS8;
+    //cfmakeraw(&client_term);
+    ret = tcsetattr(STDIN_FILENO, 0, &client_term);
+    if (ret < 0) {
+        ERROR(errno);
+        return -1;
+    }
 
     if (connection_type == UDP_CON) {
         *sk = socket(AF_INET, SOCK_DGRAM, 0);
@@ -966,11 +992,7 @@ int threads_distribute(struct server_info* info, struct message* msg,
     /* Access the corresponding location in memory */
     int ret = 0;
 
-    if (info->connection_type == UDP_CON) {
-        ret = info->thread_handler(info, msg, NULL);
-    } else {
         ret = info->thread_handler(info, msg, client_sk);
-    }
     if (ret < 0) {
         return -1;
     }
@@ -1025,12 +1047,7 @@ int tcp_get_msg(struct server_info* info, int* client_sk, struct message* msg, s
 int get_msg(struct server_info* info, struct message* msg, struct sockaddr_in* client_data,
              int* client_sk) {
     
-
-    if (info->connection_type == UDP_CON) {
-        info->msg_handler(info, NULL, msg, client_data);
-    } else {
         info->msg_handler(info, client_sk, msg, client_data);
-    }
 
     return 0;
 }

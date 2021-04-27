@@ -2,11 +2,11 @@
 #include "my_server.h"
 
 static int client_socket;
-void sig_handler_1(int signum) {
-    printf("Closing client socket: %d\n", client_socket);
-    close(client_socket);
-    exit(EXIT_SUCCESS);
-}
+// void sig_handler_1(int signum) {
+//     printf("Closing client socket: %d\n", client_socket);
+//     close(client_socket);
+//     exit(EXIT_SUCCESS);
+// }
 
 
 int main(int argc, char** argv) {
@@ -14,17 +14,19 @@ int main(int argc, char** argv) {
     /* UDP connection by default */
     int connection_type = UDP_CON;
     int sk = 0;
+    int ret = 0;
     struct sockaddr_in sk_addr;
     struct sockaddr_in sk_broad;
     struct sockaddr_in sk_bind;
     char* ip_addr = NULL;
     struct sockaddr_in server_data;
     struct client_info info;
+    struct termios client_term;
 
     /* Signal handling */
-    signal(SIGINT, &sig_handler_1);
-
-    int ret = 0;
+    ret = tcgetattr(STDIN_FILENO, &client_term);
+    cfmakeraw(&client_term);
+    //signal(SIGINT, &sig_handler_1);
 
     client_check_input(argc, argv, &connection_type, ip_addr);
 

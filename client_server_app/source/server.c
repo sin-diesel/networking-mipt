@@ -1,6 +1,12 @@
 /* This is server program, which creates a server and listens for
     messages from clients */
 
+/* TODO
+1) server_init args
+2) turning on bash
+3) cfmakerow
+*/
+
 #include "my_server.h"
 
 /* Mutexes for threads */

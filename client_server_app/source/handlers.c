@@ -67,7 +67,6 @@ void* tcp_handle_connection(void* memory) {
 void* udp_handle_connection(void* memory) {
 
     struct message msg;
-    int packets_sent = 0;
     int current_packet = 0;
     int ret = 0;
 

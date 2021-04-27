@@ -24,18 +24,21 @@ int log_init(char* path) {
 }
 
 int pr_date() {
-   time_t curtime;
 
-   time(&curtime);
-	char* tm = ctime(&curtime);
-	int len = strlen(tm);
+	time_t curtime;
+    int ret = 0;
+   
+    time(&curtime);
+    char* tm = ctime(&curtime);
+    int len = strlen(tm);
 
-	int ret = sprintf(buf + pos, tm);
+	ret = sprintf(buf + pos, "time: %s", tm);
 	if (ret != len) {
-		printf("error writing time to buf");
+		printf("Error writing time to buffer.\n");
 	}
-
 	pos += ret;
+
+	return 0;
 }	
 
 int pr_pid() {
@@ -43,38 +46,42 @@ int pr_pid() {
 	int ret = sprintf(buf + pos, "PID: %d ", pid);
 
 	pos += ret;
-
+	return 0;
 }
 
-int pr_warn(int log_level) {
-	int ret = 0;
-	if (log_level == LOG_ERR) {
-		ret = sprintf(buf + pos, "[] %d ", pid);
-	}
-	pos += ret;
-}
+// int pr_warn(int log_level) {
+// 	int ret = 0;
+// 	if (log_level == LOG_ERR) {
+// 		ret = sprintf(buf + pos, "[] %d ", pid);
+// 	}
+// 	pos += ret;
+// }
 
 
 
 
 int pr_log_level(int log_level, char* fmt, ...) {
+
+	int ret = 0;
+	va_list params;
+
 	if (logfd < 0) {
 		log_init(NULL);
 	}
 
 	pr_date();
-	pr_pid();
-	pr_warn(log_level);
-
-	va_list params;
+	//pr_pid();
+	//pr_warn(log_level);
 	va_start(params, fmt);
 
-	int ret = 0;
-
 	ret = vsnprintf(buf + pos, BUFSIZ - pos, fmt, params);
-	printf("pos: %d\n", pos);
+	if (ret < 0) {
+		perror("Error writing to buf: ");
+	}
+
+	printf("Pos: %d\n", pos);
 	printf("Bytes written: %d\n", ret);
-	perror("Buffer:");
+	//perror("Buffer:");
 
 	va_end(params);
 
@@ -82,4 +89,5 @@ int pr_log_level(int log_level, char* fmt, ...) {
 		perror("Error writing to fd: ");
 	}
 
+	return 0;
 }

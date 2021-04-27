@@ -5,16 +5,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include <stdio.h>
-#include <sys/wait.h>
-#include <sys/types.h>
 #include <fcntl.h>
-#include <sys/poll.h>
-#include <termios.h>
-#include <assert.h>
 #include <stdarg.h>
 #include <time.h>
-#include <sys/stat.h>
 
 
 enum {
